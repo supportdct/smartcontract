@@ -53,7 +53,6 @@ contract StakingDCT {
     // address to collect claim transaction tax -- token
     address public immutable addrtax;
     uint64 public constant rewardInterval = 8 days;
-    uint64 public constant stakingDuration = 90 days;
     uint64 public constant burnedDuration = 90 days;
     // max claim in a row, reset to 0 after 11
     uint8 public constant maxCycle = 11;
