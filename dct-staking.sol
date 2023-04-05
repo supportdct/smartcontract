@@ -53,7 +53,6 @@ contract StakingDCT {
     // address to collect claim transaction tax -- token
     address public immutable addrtax;
     uint64 public constant rewardInterval = 8 days;
-    uint64 public constant stakingDuration = 90 days;
     uint64 public constant burnedDuration = 90 days;
     // max claim in a row, reset to 0 after 11
     uint8 public constant maxCycle = 11;
@@ -195,7 +194,7 @@ contract StakingDCT {
         // amount gt 0
         require(amount > 0, "Amount to stake must be greater than 0");
         // tokenSuply + amount should be less than maxSupply
-        require((token.totalSupply() + amount) < token.maxSupply(), "Amount to stake must be greater than 0");
+        require((token.totalSupply() + amount) < token.maxSupply(), "Amount to stake must be less than maxSupply");
         // amountStaked+amount lt or the same with maxStaking
         require((stakers[msg.sender].amountStaked + pendingStaking[msg.sender] + amount) <= maxStaking[minerType[msg.sender]], string(abi.encodePacked("Maximum staking ", maxStaking[minerType[msg.sender]])));
 
@@ -236,7 +235,7 @@ contract StakingDCT {
             stakers[msg.sender].status = 1;
             stakers[msg.sender].amountStaked = amount;
             stakers[msg.sender].lastRewardTime = block.timestamp;
-            totalStaked = totalStaked + (amount);
+            totalStaked = totalStaked + amount;
         }
 
         emit Staked(msg.sender, amount);
@@ -381,6 +380,10 @@ contract StakingDCT {
     function importOldStaker(address staker, uint8 xstatus, uint8 typeminer, uint256 locksetup, uint256 lockAmount, uint256 stakedTimestamp, uint256 amountStaked, uint256 pendingStaked, uint256 lastReward, uint256 minervaliduntil, uint8 minercycle) public onlyOwner openImport returns (bool) {
         require(!stakers[staker].approved, "Address has approved");
         require(typeminer>=1 && typeminer<=3, "Invalid miner type");
+        require(xstatus==1, "Status not running");
+
+        // transfer from admin to staking smartcontact
+        require(token.transferFrom(msg.sender, address(this), amountStaked), "Transfer failed");
 
         oldStaker[staker] = true;
         importStaker[staker] = true;
@@ -512,11 +515,10 @@ contract StakingDCT {
 
     function getClaimableReward(address staker) public view returns (uint256) {
         require(stakers[staker].amountStaked > 0, "Staker must have staked a positive amount");
-        uint256 elapsedTime = uint256(block.timestamp - stakers[staker].lastRewardTime) / rewardInterval;
 
         uint256 dailyReward = _calcReward(staker);
         // reward every rewardInterval
-        uint256 reward = dailyReward * (elapsedTime);
+        uint256 reward = dailyReward * uint256(block.timestamp - stakers[staker].lastRewardTime) / rewardInterval;
         return reward;
     }
 }
