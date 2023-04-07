@@ -191,6 +191,9 @@ contract StakingDCT {
         // tokenSuply + amount should be less than maxSupply
         require((token.totalSupply() + amount) < token.maxSupply(), "Amount to stake must be less than maxSupply");
         // amountStaked+amount lt or the same with maxStaking
+        if(stakers[msg.sender].amountStaked == 0) {
+            minerType[msg.sender] = 1;
+        }
         require((stakers[msg.sender].amountStaked + pendingStaking[msg.sender] + amount) <= maxStaking[minerType[msg.sender]], string(abi.encodePacked("Maximum staking ", maxStaking[minerType[msg.sender]])));
 
         _checkStage();
@@ -223,9 +226,8 @@ contract StakingDCT {
                 minerPrice[msg.sender] = setupMinerPrice[minerType[msg.sender]];
             }            
         } else {
-            minerType[msg.sender] = 1;
-            minerPrice[msg.sender] = setupMinerPrice[1];
-            stakers[msg.sender].lockSetup = 4 * (10 ** uint256(token.decimals()));
+            minerPrice[msg.sender] = setupMinerPrice[minerType[msg.sender]];
+            stakers[msg.sender].lockSetup = 4000000000000000000;
             stakers[msg.sender].lockAmount = 0;
 
             stakers[msg.sender].stakedTimestamp = block.timestamp;
