@@ -29,7 +29,6 @@ contract StakingDCT {
     mapping (uint8 => uint256) public maxStaking;
 
     struct Staker {
-        bool approved;
         uint8 status;   // 0:inactive; 1:active; 2:unstake; 3:burned;
         uint256 lockSetup; // set lock amount when staker claim stake capital
         uint256 lockAmount;
@@ -72,7 +71,6 @@ contract StakingDCT {
     event ImportStaked(address staker, uint256 amount);
     event Unstaked(address staker, uint256 amount);
     event ClaimedReward(address staker, uint256 reward);
-    event ApprovedStaker(address staker);
     event ChangeContractOwner(address staker);
     event ChangeTronRate(uint256 amount);
     event ChangeFirstStakingFee(uint256 amount);
@@ -187,9 +185,6 @@ contract StakingDCT {
         uint256 allowance = token.allowance(msg.sender, address(this));
         // validate allowance
         require(allowance >= amount, "Invalid allowance");
-        // address should approve
-        require(stakers[msg.sender].approved, "Address not approved");
-        // staker should 0 or 1
         require(stakers[msg.sender].status<=2, "Staker stoped/burned");
         // amount gt 0
         require(amount > 0, "Amount to stake must be greater than 0");
@@ -228,6 +223,11 @@ contract StakingDCT {
                 minerPrice[msg.sender] = setupMinerPrice[minerType[msg.sender]];
             }            
         } else {
+            minerType[msg.sender] = 1;
+            minerPrice[msg.sender] = setupMinerPrice[1];
+            stakers[msg.sender].lockSetup = 4 * (10 ** uint256(token.decimals()));
+            stakers[msg.sender].lockAmount = 0;
+
             stakers[msg.sender].stakedTimestamp = block.timestamp;
             
             stakers[msg.sender].minerBurnedTimestamp = 0;
@@ -284,7 +284,6 @@ contract StakingDCT {
     }
 
     function claimReward() payable public returns (bool) {
-        require(stakers[msg.sender].approved, "Address not approved");
         require(stakers[msg.sender].status==1 || stakers[msg.sender].status==2, "Staker status not active");
         if(stakers[msg.sender].minerBurnedTimestamp > 0 && block.timestamp >= stakers[msg.sender].minerBurnedTimestamp) {
             revert("Staking burned duration exceeded");
@@ -361,24 +360,7 @@ contract StakingDCT {
         return true;
     }
 
-    function approveStaker(address staker, uint8 typeminer, uint256 locksetup ) public onlyOwner returns (bool) {
-        require(!stakers[staker].approved, "Address has approved");
-        require(typeminer>=1 && typeminer<=3, "Invalid miner type");
-
-        // set miner price
-        minerType[staker] = typeminer;
-        minerPrice[staker] = setupMinerPrice[typeminer];
-
-        stakers[staker].approved = true;
-        
-        stakers[staker].lockSetup = locksetup;
-        stakers[staker].lockAmount = 0;
-        emit ApprovedStaker(staker);
-        return true;
-    }
-
     function importOldStaker(address staker, uint8 xstatus, uint8 typeminer, uint256 locksetup, uint256 lockAmount, uint256 stakedTimestamp, uint256 amountStaked, uint256 pendingStaked, uint256 lastReward, uint256 minervaliduntil, uint8 minercycle) public onlyOwner openImport returns (bool) {
-        require(!stakers[staker].approved, "Address has approved");
         require(typeminer>=1 && typeminer<=3, "Invalid miner type");
         require(xstatus==1, "Status not running");
 
@@ -393,7 +375,6 @@ contract StakingDCT {
         minerType[staker] = typeminer;
         minerPrice[staker] = setupMinerPrice[typeminer];
 
-        stakers[staker].approved = true;
         stakers[staker].status = xstatus;
         
         stakers[staker].lockSetup = locksetup;
@@ -474,7 +455,6 @@ contract StakingDCT {
     }
 
     function getStakerInfo(address staker) public view returns (
-        bool approved,
         uint8 status,   
         uint256 maxStakingx,
         uint256 lockSetup, 
@@ -484,7 +464,6 @@ contract StakingDCT {
         uint256 minerBurnedTimestamp, 
         uint256 rpendingStaking) {
         
-        approved = stakers[staker].approved;
         status = stakers[staker].status;   
         maxStakingx = maxStaking[minerType[staker]];
         lockSetup = stakers[staker].lockSetup; 
@@ -515,10 +494,11 @@ contract StakingDCT {
 
     function getClaimableReward(address staker) public view returns (uint256) {
         require(stakers[staker].amountStaked > 0, "Staker must have staked a positive amount");
+        uint256 elapsedTime = uint256(block.timestamp - stakers[staker].lastRewardTime) / rewardInterval;
 
         uint256 dailyReward = _calcReward(staker);
         // reward every rewardInterval
-        uint256 reward = dailyReward * uint256(block.timestamp - stakers[staker].lastRewardTime) / rewardInterval;
+        uint256 reward = dailyReward * (elapsedTime);
         return reward;
     }
 }
