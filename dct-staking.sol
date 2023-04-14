@@ -165,6 +165,45 @@ contract StakingDCT {
         return payoutLeft;
     }
 
+    function _burnStaker(address staker) internal virtual {
+        uint256 amount = stakers[staker].amountStaked + pendingStaking[staker];
+        uint256 toburn = 0;
+        uint256 totallocked = (stakers[staker].lockAmount) + (stakers[staker].lockSetup);
+        if(amount <= totallocked) {
+            // burn amount
+            toburn = amount;
+            require(token.burn(amount), "Failed staker burned");
+        } else {
+            // transfer rest token
+            require(token.transfer(staker, (amount - totallocked)), "Failed transfer token!");
+            toburn = totallocked;
+            // burn lock
+            require(token.burn(toburn), "Failed staker burned");
+        }
+
+        totalStaked = totalStaked - toburn;
+        
+        // reset all data
+        stakers[staker].status = 0;
+        stakers[staker].lockAmount = 0;
+        stakers[staker].amountStaked = 0;
+        stakers[staker].lastRewardTime = 0;
+        stakers[staker].stakedTimestamp = 0;
+        stakers[staker].minerBurnedTimestamp = 0;
+
+        pendingStaking[staker] = 0;
+
+        stakerMinted[staker] = 0;
+        minerLastPayout[staker] = 0;
+
+        minerCycle[staker] = 0;
+        minerRoundCycle[staker] = 0;
+
+        oldStaker[staker] = false;
+        importStaker[staker] = false;
+        oldStakerValidUntil[staker] = 0;
+    }
+
     function calcFirstStakingFee() public view returns (uint256){
         return _calcFirstStakingFee();
     }
@@ -186,6 +225,15 @@ contract StakingDCT {
         // validate allowance
         require(allowance >= amount, "Invalid allowance");
         require(stakers[msg.sender].status<=2, "Staker stoped/burned");
+
+        if(!(stakers[msg.sender].status == 2 && minerCycle[msg.sender] == 11) && stakers[msg.sender].amountStaked > 0) {
+            require(block.timestamp <= (stakers[msg.sender].lastRewardTime + rewardInterval), "There are rewards that have not been claimed");
+        }
+
+        if(stakers[msg.sender].minerBurnedTimestamp > 0 && block.timestamp >= stakers[msg.sender].minerBurnedTimestamp) {
+            _burnStaker(msg.sender);
+        }
+
         // amount gt 0
         require(amount > 0, "Amount to stake must be greater than 0");
         // tokenSuply + amount should be less than maxSupply
@@ -220,6 +268,8 @@ contract StakingDCT {
             if(stakers[msg.sender].status == 2) {
                 // change miner status to 1
                 stakers[msg.sender].status = 1;
+                stakers[msg.sender].stakedTimestamp = block.timestamp;
+                stakers[msg.sender].lastRewardTime = block.timestamp;
                 // minerCycle start from 0
                 minerCycle[msg.sender] = 0;
                 minerRoundCycle[msg.sender] = 0;
@@ -251,8 +301,8 @@ contract StakingDCT {
         _checkStage();
 
         if(oldStaker[msg.sender]) {
-            minerCycle[msg.sender] = 0;
-            minerFirstTimeFee[msg.sender] = _calcFirstStakingFee();
+            // minerCycle[msg.sender] = 0;
+            // minerFirstTimeFee[msg.sender] = _calcFirstStakingFee();
             oldStaker[msg.sender] = false;
         } else {
             // calculate the remaining miner fees that must be paid
@@ -399,24 +449,7 @@ contract StakingDCT {
 
     function burnStaker(address staker) public onlyOwner returns (bool) {
         require(stakers[staker].minerBurnedTimestamp > 0 && block.timestamp>stakers[staker].minerBurnedTimestamp, "It's not time to burn yet");
-        uint256 amount = stakers[staker].amountStaked + pendingStaking[staker];
-        uint256 toburn = 0;
-        uint256 totallocked = (stakers[staker].lockAmount) + (stakers[staker].lockSetup);
-        if(amount <= totallocked) {
-            // burn amount
-            toburn = amount;
-            require(token.burn(amount), "Failed staker burned");
-        } else {
-            // transfer rest token
-            require(token.transfer(staker, (amount - totallocked)), "Failed transfer token!");
-            toburn = totallocked;
-            // burn lock
-            require(token.burn(toburn), "Failed staker burned");
-        }
-        stakers[staker].amountStaked = 0;
-        stakers[staker].status = 3;
-        pendingStaking[staker] = 0;
-        totalStaked = totalStaked - (toburn);
+        _burnStaker(staker);
         return true;
     }
 
