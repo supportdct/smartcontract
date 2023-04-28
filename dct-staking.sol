@@ -42,13 +42,13 @@ contract StakingDCT {
     mapping(uint8 => uint16) public rewardPercentage; // div 10000
 
     // address to collect miner usage fee -- tron
-    address payable public immutable addrminerfee;
+    address payable public addrminerfee;
     // address to collect first staking fee -- tron
     address payable public immutable addrfirststakingfee;
     // amount first staking fee;
     uint256 public firststakingfee;
     // address to collect claim transaction fee -- token
-    address public immutable addrfee;
+    address public addrfee;
     // address to collect claim transaction tax -- token
     address public immutable addrtax;
     uint64 public constant rewardInterval = 8 days;
@@ -56,7 +56,7 @@ contract StakingDCT {
     // max claim in a row, reset to 0 after 11
     uint8 public constant maxCycle = 11;
     // active stage
-    uint8 public nowStage = 1;
+    uint8 public nowStage = 2;
     // max stage available
     uint8 public constant maxStage = 7;
     // set up fee each claim token reward
@@ -473,6 +473,18 @@ contract StakingDCT {
         require(typeminer>=1 && typeminer<=3, "Invalid miner type");
         setupMinerPrice[typeminer] = price;
         emit ChangeMinerPrice(price, typeminer);
+        return true;
+    }
+
+    function changeAddrFee(address newAddr) public onlyOwner returns (bool) {
+        require(newAddr != address(0), "Zero address");
+        addrfee = newAddr;
+        return true;
+    }
+
+    function changeAddrMinerFee(address payable newAddr) public onlyOwner returns (bool) {
+        require(newAddr != address(0), "Zero address");
+        addrminerfee = newAddr;
         return true;
     }
 
