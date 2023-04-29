@@ -6,6 +6,7 @@ import "./dct.sol";
 
 contract StakingDCT {
     address public owner;
+    mapping (address => bool) public isAdministrator;
     uint256 public totalStaked;
     uint256 public totalPendingStaked;
     mapping (address => Staker) public stakers;
@@ -75,9 +76,15 @@ contract StakingDCT {
     event ChangeTronRate(uint256 amount);
     event ChangeFirstStakingFee(uint256 amount);
     event ChangeMinerPrice(uint256 price, uint8 typeminer);
+    event ChangeAdministratorStatus(address adminAddr, bool status);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "ACCESS_DENIED");
+        _;
+    }
+
+    modifier onlyAdmin() {
+        require(isAdministrator[msg.sender], "ADMIN_ONLY");
         _;
     }
 
@@ -412,7 +419,7 @@ contract StakingDCT {
         return true;
     }
 
-    function importOldStaker(address staker, uint8 xstatus, uint8 typeminer, uint256 locksetup, uint256 lockAmount, uint256 stakedTimestamp, uint256 amountStaked, uint256 pendingStaked, uint256 lastReward, uint256 minervaliduntil, uint8 minercycle) public onlyOwner openImport returns (bool) {
+    function importOldStaker(address staker, uint8 xstatus, uint8 typeminer, uint256 locksetup, uint256 lockAmount, uint256 stakedTimestamp, uint256 amountStaked, uint256 pendingStaked, uint256 lastReward, uint256 minervaliduntil, uint8 minercycle) public onlyAdmin openImport returns (bool) {
         require(typeminer>=1 && typeminer<=3, "Invalid miner type");
         require(xstatus==1, "Status not running");
 
@@ -491,7 +498,14 @@ contract StakingDCT {
     function changeContractOwnership(address newOwner) public onlyOwner returns (bool) {
         require(newOwner != address(0), "Zero address");
         owner = newOwner;
-        emit ChangeContractOwner(msg.sender);
+        emit ChangeContractOwner(newOwner);
+        return true;
+    }
+
+    function setAdministrator(address adminAddr, bool status) public onlyOwner returns (bool) {
+        require(adminAddr != address(0), "Zero address");
+        isAdministrator[adminAddr] = status;
+        emit ChangeAdministratorStatus(adminAddr, status);
         return true;
     }
 
