@@ -422,6 +422,7 @@ contract StakingDCT {
     function importOldStaker(address staker, uint8 xstatus, uint8 typeminer, uint256 locksetup, uint256 lockAmount, uint256 stakedTimestamp, uint256 amountStaked, uint256 pendingStaked, uint256 lastReward, uint256 minervaliduntil, uint8 minercycle) public onlyAdmin openImport returns (bool) {
         require(typeminer>=1 && typeminer<=3, "Invalid miner type");
         require(xstatus==1, "Status not running");
+        require(stakers[staker].status==0, "Already running");
 
         // transfer from admin to staking smartcontact
         require(token.transferFrom(msg.sender, address(this), amountStaked), "Transfer failed");
